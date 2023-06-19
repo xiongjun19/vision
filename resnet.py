@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from torchvision._utils import _ovewrite_named_param, handle_legacy_interface
+# from torchvision._utils import _ovewrite_named_param, handle_legacy_interface
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
@@ -248,16 +248,13 @@ class ResNet(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
 
-
 def _resnet(
     block: Type[Union[BasicBlock, Bottleneck]],
     layers: List[int],
-    weights: Optional[WeightsEnum],
+    weights,
     progress: bool,
     **kwargs: Any,
 ) -> ResNet:
-    if weights is not None:
-        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
 
     model = ResNet(block, layers, **kwargs)
 
@@ -267,14 +264,14 @@ def _resnet(
     return model
 
 
-def resnet18(*, weights: Optional[ResNet18_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
+def resnet18(*, weights = None, progress: bool = True, **kwargs: Any) -> ResNet:
     return _resnet(BasicBlock, [2, 2, 2, 2], weights, progress, **kwargs)
 
 
-def resnet34(*, weights: Optional[ResNet34_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
+def resnet34(*, weights = None, progress: bool = True, **kwargs: Any) -> ResNet:
     return _resnet(BasicBlock, [3, 4, 6, 3], weights, progress, **kwargs)
 
 
-def resnet50(*, weights: Optional[ResNet50_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
+def resnet50(*, weights = None, progress: bool = True, **kwargs: Any) -> ResNet:
     return _resnet(Bottleneck, [3, 4, 6, 3], weights, progress, **kwargs)
 
