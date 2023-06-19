@@ -5,6 +5,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 def get_dataset(in_dir):
@@ -42,8 +43,9 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, help='input dir of the image')
     parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--epoches', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--num_work', type=int,  default=1)
     args = parser.parse_args()
     return args
 
@@ -57,7 +59,7 @@ def train(args):
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     for epoch in range(args.epochs):
-        for inputs, labels in train_loader:
+        for inputs, labels in tqdm(train_loader):
             inputs = inputs.to(device)
             labels = labels.to(device)
             optimizer.zero_grad()
