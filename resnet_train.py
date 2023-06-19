@@ -6,6 +6,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from resnet import resnet50
 
 
 def get_dataset(in_dir):
@@ -35,7 +36,8 @@ def get_dataloader(ds, args):
 
 
 def get_model(args):
-    model = torchvision.models.resnet50(pretrained=True)
+    # model = torchvision.models.resnet50(pretrained=True)
+    model = resnet50()
     return model
 
 
