@@ -6,7 +6,9 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from functools import partial
 from resnet import resnet50
+from timer import Timers
 
 
 def get_dataset(in_dir):
@@ -38,15 +40,33 @@ def get_dataloader(ds, args):
 def get_model(args):
     # model = torchvision.models.resnet50(pretrained=True)
     model = resnet50()
-    key_arr = ['conv', 'downsample.0', 'fc'] 
+    return model
+
+
+def register_forward_hooks(model, timer):
+    key_arr = ['conv', 'downsample.0', 'fc']
     cnt = 0
+    base_name = 'fwd'
     for name, _module in model.named_modules():
         if _is_trace_module(key_arr, name):
-            print(name)
-            print(_module)
+            time_key = f'{base_name}_{cnt}'
             cnt += 1
-    print("num_layers: ", cnt)
-    return model
+            _module.register_forward_pre_hook(partial(pre_fw_hook, timer, time_key))
+            _module.register_forward_hook(partial(fw_hook, timer, time_key))
+    print("complete register forward hooks")
+
+
+def pre_fw_hook(timer, name, module, *argv):
+    timer(name).start()
+
+
+def fw_hook(timer, name, module, *argv):
+    timer(name).stop()
+    timer(name).log([name])
+
+
+def register_backward_hooks(model, timer):
+    pass
 
 
 def _is_trace_module(key_arr, name):
@@ -62,15 +82,17 @@ def get_args():
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--num_work', type=int,  default=1)
+    parser.add_argument('--num_work', type=int, default=1)
     args = parser.parse_args()
     return args
 
 
 def train(args):
+    timer = Timers()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = get_model(args)
     model = model.to(device)
+    register_forward_hooks(model, timer)
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
