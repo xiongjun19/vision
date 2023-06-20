@@ -66,8 +66,28 @@ def fw_hook(timer, name, module, *argv):
     timer.log([name])
 
 
+def bw_ig_hook(timer, name, *argv):
+    prefix = 'ig_' + name
+    timer.log(["backward"], reset=False, prefix=prefix)
+
+
+def bw_wg_hook(timer, name, *argv):
+    prefix = 'wg_' + name
+    timer.log(["backward"], reset=False, prefix=prefix)
+
+
 def register_backward_hooks(model, timer):
-    pass
+    key_arr = ['conv', 'downsample.0', 'fc']
+    cnt = 0
+    base_name = 'bwd'
+    for name, _module in model.named_modules():
+        if _is_trace_module(key_arr, name):
+            time_key = f'{base_name}_{cnt}'
+            cnt += 1
+            _module.register_backward_hook(partial(bw_ig_hook, timer, time_key))
+            _module.weight.register_hook(partial(bw_wg_hook, timer, time_key))
+    print("cnt is ", cnt)
+    print("complete register forward hooks")
 
 
 def _is_trace_module(key_arr, name):
@@ -94,10 +114,12 @@ def train(args):
     model = get_model(args)
     model = model.to(device)
     register_forward_hooks(model, timer)
+    register_backward_hooks(model, timer)
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    tot_iters = 20
     iter_no = 0
     for epoch in range(args.epochs):
         for inputs, labels in train_loader:
@@ -116,9 +138,14 @@ def train(args):
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             # Backward pass
+            timer('backward').start()
             loss.backward()
+            timer('backward').stop()
+            timer.log(['backward'])
             optimizer.step()
             iter_no += 1
+            if iter_no >= tot_iters:
+                break
 
         # Print the loss for every epoch
         print(f'Epoch {epoch+1}/{args.epochs}, Loss: {loss.item():.4f}')

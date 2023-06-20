@@ -83,7 +83,7 @@ class Timers:
             value = self.timers[name].elapsed(reset=reset) / normalizer
             writer.add_scalar(name + '-time', value, iteration)
 
-    def log(self, names, normalizer=1.0, reset=True, prefix_name=None):
+    def log(self, names, normalizer=1.0, reset=True, prefix=None):
         """Log a group of timers."""
         assert normalizer > 0.0
         string = 'time (ms)'
@@ -91,8 +91,8 @@ class Timers:
             elapsed_time = self.timers[name].elapsed(
                 reset=reset) * 1000.0 / normalizer
             string += ' | {}: {:.2f}'.format(name, elapsed_time)
-        if prefix_name is not None:
-            string = prefix_name + " _sep_ " + string
+        if prefix is not None:
+            string = prefix + " _sep_ " + string
         if torch.distributed.is_initialized():
             if torch.distributed.get_rank() == (
                     torch.distributed.get_world_size() - 1):
