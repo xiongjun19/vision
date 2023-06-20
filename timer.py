@@ -8,7 +8,7 @@ import torch
 def get_accelerator():
     if torch.cuda.is_available():
         return True
-    return None
+    return False
 
 
 class _Timer:
@@ -24,7 +24,7 @@ class _Timer:
         """Start the timer."""
         assert not self.started_, 'timer has already been started'
         device = get_accelerator()
-        if device is not None:
+        if device:
             torch.cuda.synchronize()
         # get_accelerator().synchronize()
         self.start_time = time.time()
@@ -34,7 +34,7 @@ class _Timer:
         """Stop the timer."""
         assert self.started_, 'timer is not started'
         device = get_accelerator()
-        if device is not None:
+        if device:
             torch.cuda.synchronize()
         # get_accelerator().synchronize()
         self.elapsed_ += (time.time() - self.start_time)
@@ -91,7 +91,7 @@ class Timers:
             elapsed_time = self.timers[name].elapsed(
                 reset=reset) * 1000.0 / normalizer
             string += ' | {}: {:.2f}'.format(name, elapsed_time)
-        if prefix_name is Not None:
+        if prefix_name is not None:
             string = prefix_name + " _sep_ " + string
         if torch.distributed.is_initialized():
             if torch.distributed.get_rank() == (

@@ -53,6 +53,7 @@ def register_forward_hooks(model, timer):
             cnt += 1
             _module.register_forward_pre_hook(partial(pre_fw_hook, timer, time_key))
             _module.register_forward_hook(partial(fw_hook, timer, time_key))
+    print("cnt is ", cnt)
     print("complete register forward hooks")
 
 
@@ -62,7 +63,7 @@ def pre_fw_hook(timer, name, module, *argv):
 
 def fw_hook(timer, name, module, *argv):
     timer(name).stop()
-    timer(name).log([name])
+    timer.log([name])
 
 
 def register_backward_hooks(model, timer):
@@ -97,8 +98,17 @@ def train(args):
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    iter_no = 0
     for epoch in range(args.epochs):
-        for inputs, labels in tqdm(train_loader):
+        for inputs, labels in train_loader:
+            iter_str = f"iteration number:{iter_no}"
+            if torch.distributed.is_initialized():
+                if torch.distributed.get_rank() == (
+                        torch.distributed.get_world_size() - 1):
+                    print(iter_str, flush=True)
+            else:
+                print(iter_str, flush=True)
+
             inputs = inputs.to(device)
             labels = labels.to(device)
             optimizer.zero_grad()
@@ -108,6 +118,8 @@ def train(args):
             # Backward pass
             loss.backward()
             optimizer.step()
+            iter_no += 1
+
         # Print the loss for every epoch
         print(f'Epoch {epoch+1}/{args.epochs}, Loss: {loss.item():.4f}')
     print(f'Finished Training, Loss: {loss.item():.4f}')
