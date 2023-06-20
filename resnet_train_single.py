@@ -33,12 +33,7 @@ def get_dataset(in_dir):
 
 
 def get_dataloader(ds, args):
-    sampler = None
-    if args.world_size > 1:
-        sampler = torch.utils.data.DistributedSampler(ds, shuffle=True)
-    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, shuffle=True,
-            num_workers=args.num_work, pin_memory=True,
-            sampler=sampler)
+    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_work)
     return dl
 
 
@@ -109,59 +104,17 @@ def get_args():
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--num_work', type=int, default=1)
-    group = parser.add_argument_group(title='distributed')
-    group.add_argument('--distributed-backend', default='nccl',
-                       choices=['nccl', 'gloo'],
-                       help='Which backend to use for distributed training.')
-    group.add_argument('--DDP-impl', default='local',
-                       choices=['local', 'torch'],
-                       help='which DistributedDataParallel implementation '
-                       'to use.')
-    group.add_argument('--local_rank', type=int, default=None,
-                       help='local rank passed from distributed launcher.')
     args = parser.parse_args()
     return args
 
 
-def _initialize_distributed(args):
-    device_count = torch.cuda.device_count()
-    if torch.distributed.is_initialized():
-        if args.rank == 0:
-            print('torch distributed is already initialized, '
-                  'skipping initialization ...', flush=True)
-        args.rank = torch.distributed.get_rank()
-        args.world_size = torch.distributed.get_world_size()
-    else:
-        if args.rank == 0:
-            print('> initializing torch distributed ...', flush=True)
-        # Manually set the device ids.
-        if device_count > 0:
-            device = args.rank % device_count
-            if args.local_rank is not None:
-                assert args.local_rank == device, \
-                    'expected local-rank to be the same as rank % device-count.'
-            else:
-                args.local_rank = device
-            torch.cuda.set_device(device)
-    # Call the init process
-    torch.distributed.init_process_group(
-        backend=args.distributed_backend,
-        world_size=args.world_size,
-        rank=args.rank,
-        timeout=timedelta(days=7))
-
-
 def train(args):
     timer = Timers()
-    _initialize_distributed(args)
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = get_model(args)
-    if args.local_rank >= 0:
-        model = model.cuda()
+    model = model.to(device)
     register_forward_hooks(model, timer)
     register_backward_hooks(model, timer)
-    if torch.distributed.get_world_size > 1:
-        model = torch.nn.parallel.DistributedDataParallel(model)
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
@@ -170,8 +123,6 @@ def train(args):
     iter_no = 0
     for epoch in range(args.epochs):
         for inputs, labels in train_loader:
-            if train_loader.sampler is not None:
-                train_loader.sampler.set_epoch(epoch)
             iter_str = f"iteration number:{iter_no}"
             if torch.distributed.is_initialized():
                 if torch.distributed.get_rank() == (
@@ -180,10 +131,8 @@ def train(args):
             else:
                 print(iter_str, flush=True)
 
-            # inputs = inputs.to(device)
-            # labels = labels.to(device)
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             optimizer.zero_grad()
             # Forward pass
             outputs = model(inputs)
