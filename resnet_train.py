@@ -38,7 +38,22 @@ def get_dataloader(ds, args):
 def get_model(args):
     # model = torchvision.models.resnet50(pretrained=True)
     model = resnet50()
+    key_arr = ['conv', 'downsample.0', 'fc'] 
+    cnt = 0
+    for name, _module in model.named_modules():
+        if _is_trace_module(key_arr, name):
+            print(name)
+            print(_module)
+            cnt += 1
+    print("num_layers: ", cnt)
     return model
+
+
+def _is_trace_module(key_arr, name):
+    for key in key_arr:
+        if key in name.lower():
+            return True
+    return False
 
 
 def get_args():
@@ -72,7 +87,7 @@ def train(args):
             loss.backward()
             optimizer.step()
         # Print the loss for every epoch
-        print(f'Epoch {epoch+1}/{num_epochs}, Loss: {loss.item():.4f}')
+        print(f'Epoch {epoch+1}/{args.epochs}, Loss: {loss.item():.4f}')
     print(f'Finished Training, Loss: {loss.item():.4f}')
 
 
