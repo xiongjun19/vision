@@ -1,5 +1,6 @@
 # coding=utf8
 
+import os
 import argparse
 import torch
 import torchvision
@@ -36,7 +37,7 @@ def get_dataloader(ds, args):
     sampler = None
     if args.world_size > 1:
         sampler = torch.utils.data.DistributedSampler(ds, shuffle=True)
-    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, shuffle=True,
+    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, 
             num_workers=args.num_work, pin_memory=True,
             sampler=sampler)
     return dl
@@ -120,6 +121,8 @@ def get_args():
     group.add_argument('--local_rank', type=int, default=None,
                        help='local rank passed from distributed launcher.')
     args = parser.parse_args()
+    args.rank = int(os.getenv('RANK', '0'))
+    args.world_size = int(os.getenv("WORLD_SIZE", '1'))
     return args
 
 
@@ -147,8 +150,7 @@ def _initialize_distributed(args):
     torch.distributed.init_process_group(
         backend=args.distributed_backend,
         world_size=args.world_size,
-        rank=args.rank,
-        timeout=timedelta(days=7))
+        rank=args.rank)
 
 
 def train(args):
@@ -160,7 +162,7 @@ def train(args):
         model = model.cuda()
     register_forward_hooks(model, timer)
     register_backward_hooks(model, timer)
-    if torch.distributed.get_world_size > 1:
+    if torch.distributed.get_world_size() > 1:
         model = torch.nn.parallel.DistributedDataParallel(model)
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
@@ -169,9 +171,9 @@ def train(args):
     tot_iters = 20
     iter_no = 0
     for epoch in range(args.epochs):
+        if train_loader.sampler is not None:
+            train_loader.sampler.set_epoch(epoch)
         for inputs, labels in train_loader:
-            if train_loader.sampler is not None:
-                train_loader.sampler.set_epoch(epoch)
             iter_str = f"iteration number:{iter_no}"
             if torch.distributed.is_initialized():
                 if torch.distributed.get_rank() == (
