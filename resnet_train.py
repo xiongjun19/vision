@@ -188,11 +188,16 @@ def train(args):
             labels = labels.cuda()
             optimizer.zero_grad()
             # Forward pass
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            # Backward pass
-            timer('backward').start()
-            loss.backward()
+            with model.no_sync():
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                # Backward pass
+                timer('backward').start()
+                loss.backward()
+            if args.world_size > 1:
+                for param in self.module.parameters():
+                    if param.requires_grad and param.grad is not None:
+                        torch.distributed.all_reduce(param.grad)
             timer('backward').stop()
             timer.log(['backward'])
             optimizer.step()
