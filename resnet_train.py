@@ -172,7 +172,8 @@ def train(args):
     iter_no = 0
     for epoch in range(args.epochs):
         if train_loader.sampler is not None:
-            train_loader.sampler.set_epoch(epoch)
+            if args.world_size > 1:
+                train_loader.sampler.set_epoch(epoch)
         for inputs, labels in train_loader:
             iter_str = f"iteration number:{iter_no}"
             if torch.distributed.is_initialized():
