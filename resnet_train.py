@@ -195,7 +195,7 @@ def train(args):
                 timer('backward').start()
                 loss.backward()
             if args.world_size > 1:
-                for param in self.module.parameters():
+                for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
                         torch.distributed.all_reduce(param.grad)
             timer('backward').stop()
