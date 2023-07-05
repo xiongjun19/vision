@@ -189,12 +189,20 @@ def train(args):
             labels = labels.cuda()
             optimizer.zero_grad()
             # Forward pass
-            with model.no_sync():
+            if args.world_size > 1:
+                with model.no_sync():
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+                    # Backward pass
+                    timer('backward').start()
+                    loss.backward()
+            else:
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 # Backward pass
                 timer('backward').start()
                 loss.backward()
+
             if args.world_size > 1:
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
