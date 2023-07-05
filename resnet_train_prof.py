@@ -189,18 +189,20 @@ def train(args):
     end_iters = warm_iters + 3 
     start_status = False
     for epoch in range(args.epochs):
-        if iter_no >= warm_iters and iter_no < end_iters:
-            if not start_status:
-                p_start()
-                start_status = True
-        elif iter_no >= end_iters:
-            if start_status:
-                p_end()
-                start_status = False
+        
         if train_loader.sampler is not None:
             if args.world_size > 1:
                 train_loader.sampler.set_epoch(epoch)
         for inputs, labels in train_loader:
+            if iter_no >= warm_iters and iter_no < end_iters:
+                if not start_status:
+                    print("start here") 
+                    p_start()
+                    start_status = True
+            elif iter_no >= end_iters:
+                if start_status:
+                    p_stop()
+                    start_status = False
             iter_str = f"iteration number:{iter_no}"
             if torch.distributed.is_initialized():
                 if torch.distributed.get_rank() == (
