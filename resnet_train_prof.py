@@ -185,7 +185,18 @@ def train(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     tot_iters = 20
     iter_no = 0
+    warm_iters = 5
+    end_iters = warm_iters + 3 
+    start_status = False
     for epoch in range(args.epochs):
+        if iter_no >= warm_iters and iter_no < end_iters:
+            if not start_status:
+                p_start()
+                start_status = True
+        elif iter_no >= end_iters:
+            if start_status:
+                p_end()
+                start_status = False
         if train_loader.sampler is not None:
             if args.world_size > 1:
                 train_loader.sampler.set_epoch(epoch)
@@ -209,21 +220,21 @@ def train(args):
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     # Backward pass
-                    timer('backward').start()
+                    # timer('backward').start()
                     loss.backward()
             else:
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
                 # Backward pass
-                timer('backward').start()
+                # timer('backward').start()
                 loss.backward()
 
             if args.world_size > 1:
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
                         torch.distributed.all_reduce(param.grad)
-            timer('backward').stop()
-            timer.log(['backward'])
+            # timer('backward').stop()
+            # timer.log(['backward'])
             optimizer.step()
             iter_no += 1
             if iter_no >= tot_iters:
