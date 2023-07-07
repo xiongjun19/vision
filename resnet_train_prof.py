@@ -234,6 +234,8 @@ def train(args):
             if args.world_size > 1:
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
+                        print('the shape is: ', param.grad.shape)
+                        print('the dtype is: ', param.grad.dtype)
                         torch.distributed.all_reduce(param.grad)
             # timer('backward').stop()
             # timer.log(['backward'])
