@@ -15,7 +15,7 @@ def main(args):
     for f_name in f_names:
         if f_name.endswith(".sqlite"):
             f_path = os.path.join(dir_path, f_name)
-            tot_time, util, nccl_ratio, mem_ratio = do_parse(f_path)
+            tot_time, util, nccl_ratio, mem_ratio = do_parse(f_path, 0)
             if tot_time is not None:
                 key = f_name.rstrip(".sqlite")
                 res[key] = dict()
