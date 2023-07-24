@@ -2,15 +2,77 @@
 
 import sys
 import os
+import numpy as np
 import pandas as pd
+import math
 
 
 def main(in_path, out_path, idx):
-    # import ipdb; ipdb.set_trace()
+    fwd_arr, ig_arr, wg_arr, wg_comm = parse_and_stat(in_path, idx)
+    _save_info(fwd_arr, ig_arr, wg_arr, wg_comm, out_path)
+
+
+def parse_one_idx(in_path, idx):
     lines = _read_file(in_path, idx)
     fwd_arr = _parse_fwd(lines)
     ig_arr, wg_arr, wg_comm = _parse_bwd(lines)
-    _save_info(fwd_arr, ig_arr, wg_arr, wg_comm, out_path)
+    return fwd_arr, ig_arr, wg_arr, wg_comm
+
+
+def parse_and_stat(in_path, start_idx):
+    res_arr = []
+    for i in range(5):
+        res = parse_one_idx(in_path, start_idx+i)
+        res_arr.append(res)
+    norm_idx_arr = _get_norm_idx(res_arr)
+    res = _calc_mean(res_arr, norm_idx_arr)
+    return res
+
+
+def _calc_mean(data_arr, idx_arr):
+    tmp_arr = []
+    for i in idx_arr:
+        tmp_arr.append(data_arr[i])
+    class_num = len(data_arr[0]) 
+    res = []
+    for i in range(class_num):
+        cur_res = _calc_mean_impl(tmp_arr, i)
+        res.append(cur_res)
+    return res
+
+    
+def _calc_mean_impl(data_arr, i):
+    tmp_arr = [] 
+    num = len(data_arr)
+    is_list = True
+    for j in range(num):
+        val = data_arr[j][i]
+        tmp_arr.append(val)
+        if not isinstance(val, list):
+            is_list = False
+    if not is_list:
+        return sum(tmp_arr) / num
+    _arr = np.array(tmp_arr)
+    res = np.mean(_arr, axis=0)
+    return res
+
+
+def _get_norm_idx(data_arr):
+    num = len(data_arr)
+    _sum = 0.
+    comm_arr = []
+    for elem_arr in data_arr:
+        _sum += elem_arr[-1]
+        comm_arr.append(elem_arr[-1])
+    m = _sum / num
+    std = math.sqrt(np.std(np.array(comm_arr)))
+    res = []
+    for i, comm in enumerate(comm_arr):
+        if comm > 3. * std + m or comm < m - 3 * std:
+            print(f"outlier at {i}, val: {comm}")
+        else:
+            res.append(i)
+    return res
 
 
 def _parse_fwd(lines):
