@@ -53,8 +53,8 @@ def register_forward_hooks(model, timer):
             cnt += 1
             _module.register_forward_pre_hook(partial(pre_fw_hook, timer, time_key))
             _module.register_forward_hook(partial(fw_hook, timer, time_key))
-    print("cnt is ", cnt)
-    print("complete register forward hooks")
+    # print("cnt is ", cnt)
+    # print("complete register forward hooks")
 
 
 def pre_fw_hook(timer, name, module, *argv):
@@ -113,13 +113,13 @@ def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = get_model(args)
     model = model.to(device)
-    register_forward_hooks(model, timer)
-    register_backward_hooks(model, timer)
+    # register_forward_hooks(model, timer)
+    # register_backward_hooks(model, timer)
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    tot_iters = 20
+    tot_iters = 10
     iter_no = 0
     for epoch in range(args.epochs):
         for inputs, labels in train_loader:
@@ -138,10 +138,10 @@ def train(args):
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             # Backward pass
-            timer('backward').start()
+            # timer('backward').start()
             loss.backward()
-            timer('backward').stop()
-            timer.log(['backward'])
+            # timer('backward').stop()
+            # timer.log(['backward'])
             optimizer.step()
             iter_no += 1
             if iter_no >= tot_iters:

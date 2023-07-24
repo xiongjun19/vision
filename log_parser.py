@@ -117,5 +117,5 @@ def _read_file(in_path, idx):
 if __name__ == '__main__':
     in_path = sys.argv[1]
     out_path = sys.argv[2]
-    idx = 2  # indicate to parse which iteration
+    idx = 4  # indicate to parse which iteration
     main(in_path, out_path, idx)

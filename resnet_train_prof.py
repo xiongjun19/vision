@@ -11,6 +11,7 @@ from functools import partial
 from resnet import resnet50
 from timer import Timers
 import ctypes
+import numpy as np
 
 _cudart = ctypes.CDLL('libcudart.so')
 
@@ -189,7 +190,6 @@ def train(args):
     end_iters = warm_iters + 3 
     start_status = False
     for epoch in range(args.epochs):
-        
         if train_loader.sampler is not None:
             if args.world_size > 1:
                 train_loader.sampler.set_epoch(epoch)
@@ -230,20 +230,32 @@ def train(args):
                 # Backward pass
                 # timer('backward').start()
                 loss.backward()
+            t_i = 0
+            key_arr = ['conv', 'downsample.0', 'fc']
+            for name, param in model.named_parameters():
+                # if _is_trace_module(key_arr, name):
+                if True:
+                    print(name,",", np.prod(param.shape) * 4)
 
+                
+                t_i += 1
             if args.world_size > 1:
+                t_i = 0
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
-                        print('the shape is: ', param.grad.shape)
-                        print('the dtype is: ', param.grad.dtype)
+                        if args.rank == 0:
+                            print("the param idx is: ", t_i)
+                            print('the shape is: ', param.grad.shape)
+                            print('the dtype is: ', param.grad.dtype)
+                            print('the bytes is: ', np.prod(param.grad.shape) * 4)
                         torch.distributed.all_reduce(param.grad)
+                        t_i += 1
             # timer('backward').stop()
             # timer.log(['backward'])
             optimizer.step()
             iter_no += 1
             if iter_no >= tot_iters:
                 break
-
         # Print the loss for every epoch
         print(f'Epoch {epoch+1}/{args.epochs}, Loss: {loss.item():.4f}')
     print(f'Finished Training, Loss: {loss.item():.4f}')

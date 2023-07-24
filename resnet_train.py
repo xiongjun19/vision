@@ -110,6 +110,7 @@ def get_args():
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--num_work', type=int, default=1)
+    parser.add_argument('--no_overlap', action='store_true')
     group = parser.add_argument_group(title='distributed')
     group.add_argument('--distributed-backend', default='nccl',
                        choices=['nccl', 'gloo'],
@@ -189,7 +190,7 @@ def train(args):
             labels = labels.cuda()
             optimizer.zero_grad()
             # Forward pass
-            if args.world_size > 1:
+            if args.world_size > 1 and args.no_overlap:
                 with model.no_sync():
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
@@ -203,7 +204,7 @@ def train(args):
                 timer('backward').start()
                 loss.backward()
 
-            if args.world_size > 1:
+            if args.world_size > 1 and args.no_overlap:
                 for param in model.parameters():
                     if param.requires_grad and param.grad is not None:
                         torch.distributed.all_reduce(param.grad)
