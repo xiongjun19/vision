@@ -10,6 +10,8 @@ from tqdm import tqdm
 from functools import partial
 from resnet import resnet50
 from timer import Timers
+from torch import autocast
+from torch.cuda.amp import GradScaler
 
 
 def get_dataset(in_dir):
@@ -161,6 +163,7 @@ def train(args):
     model = get_model(args)
     if args.local_rank >= 0:
         model = model.cuda()
+    model = model.to(memory_format=torch.channels_last)
     register_forward_hooks(model, timer)
     register_backward_hooks(model, timer)
     if torch.distributed.get_world_size() > 1:
@@ -168,7 +171,8 @@ def train(args):
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    scaler = GradScaler()
     tot_iters = 20
     iter_no = 0
     for epoch in range(args.epochs):
@@ -188,6 +192,8 @@ def train(args):
             # labels = labels.to(device)
             inputs = inputs.cuda()
             labels = labels.cuda()
+            inputs = inputs.to(memory_format=torch.channels_last, dtype=torch.float16) 
+            # labels = labels.half()
             optimizer.zero_grad()
             # Forward pass
             if args.world_size > 1 and args.no_overlap:
@@ -198,11 +204,13 @@ def train(args):
                     timer('backward').start()
                     loss.backward()
             else:
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
+                with autocast(device_type='cuda', dtype=torch.float16):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
                 # Backward pass
                 timer('backward').start()
-                loss.backward()
+                # loss.backward()
+                scaler.scale(loss).backward()
 
             if args.world_size > 1 and args.no_overlap:
                 for param in model.parameters():
@@ -210,7 +218,9 @@ def train(args):
                         torch.distributed.all_reduce(param.grad)
             timer('backward').stop()
             timer.log(['backward'])
-            optimizer.step()
+            # optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
             iter_no += 1
             if iter_no >= tot_iters:
                 break

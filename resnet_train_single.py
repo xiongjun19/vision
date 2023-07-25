@@ -9,6 +9,9 @@ from tqdm import tqdm
 from functools import partial
 from resnet import resnet50
 from timer import Timers
+# from apex import amp
+from torch import autocast
+from torch.cuda.amp import GradScaler
 
 
 def get_dataset(in_dir):
@@ -113,12 +116,15 @@ def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = get_model(args)
     model = model.to(device)
+    model = model.to(memory_format=torch.channels_last)
     # register_forward_hooks(model, timer)
     # register_backward_hooks(model, timer)
     ds = get_dataset(args.input)
     train_loader = get_dataloader(ds, args)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    # model, optimizer = amp.initialize(model, optimizer, opt_level="O2")
+    scaler = GradScaler() 
     tot_iters = 10
     iter_no = 0
     for epoch in range(args.epochs):
@@ -131,18 +137,28 @@ def train(args):
             else:
                 print(iter_str, flush=True)
 
-            inputs = inputs.to(device)
+            inputs = inputs.to(device, memory_format=torch.channels_last, dtype=torch.float16)
             labels = labels.to(device)
+            # inputs = inputs.half()
+            timer('tot').start()
             optimizer.zero_grad()
             # Forward pass
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            with autocast(device_type='cuda', dtype=torch.float16): 
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+            scaler.scale(loss).backward()
             # Backward pass
             # timer('backward').start()
-            loss.backward()
+            # loss.backward()
+            # with amp.scale_loss(loss, optimizer) as scaled_loss:
+            #     scaled_loss.backward()
             # timer('backward').stop()
             # timer.log(['backward'])
-            optimizer.step()
+            timer('tot').stop()
+            # optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
+            timer.log(['tot'])
             iter_no += 1
             if iter_no >= tot_iters:
                 break
