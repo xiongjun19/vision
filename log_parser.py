@@ -139,8 +139,8 @@ def get_final_bw(lines):
 def _post_process(ig_arr, wg_arr):
     for i in range(len(ig_arr)):
         wg_arr[i] = wg_arr[i] - ig_arr[i]
-    for i in range(len(ig_arr) - 1):
-        ig_arr[i] = ig_arr[i] - ig_arr[i+1]
+        if i < len(ig_arr) - 1:
+            ig_arr[i] = ig_arr[i] - wg_arr[i+1]
 
 
 def _save_info(fwd_arr, ig_arr, wg_arr, wg_comm, out_path):
